@@ -272,6 +272,12 @@ class SlaveLocksClient implements Locks.Client
         }
     }
 
+    @Override
+    public Locks.Client delegate()
+    {
+        return client;
+    }
+
     private boolean getReadLockOnMaster( Locks.ResourceType resourceType, long resourceId )
     {
         if ( resourceType == ResourceTypes.NODE
