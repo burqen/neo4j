@@ -30,37 +30,41 @@ import org.neo4j.kernel.ha.com.master.Master;
 import org.neo4j.kernel.impl.locking.Locks;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 
+import static org.neo4j.kernel.impl.factory.CommunityEditionModule.maybeWrapWithDeferringLockManager;
+
 public class LockManagerModeSwitcher extends AbstractModeSwitcher<Locks>
 {
     private final DelegateInvocationHandler<Master> master;
     private final RequestContextFactory requestContextFactory;
     private final AvailabilityGuard availabilityGuard;
-    private final Factory<Locks> locksFactory;
     private final Config config;
+    private final Factory<Locks> locksFactory;
 
     public LockManagerModeSwitcher( ModeSwitcherNotifier modeSwitcherNotifier,
                                     DelegateInvocationHandler<Locks> delegate, DelegateInvocationHandler<Master> master,
                                     RequestContextFactory requestContextFactory, AvailabilityGuard availabilityGuard,
-                                    Factory<Locks> locksFactory, Config config )
+                                    Config config, Factory<Locks> locksFactory )
     {
         super( modeSwitcherNotifier, delegate );
         this.master = master;
         this.requestContextFactory = requestContextFactory;
         this.availabilityGuard = availabilityGuard;
-        this.locksFactory = locksFactory;
         this.config = config;
+        this.locksFactory = locksFactory;
     }
 
     @Override
     protected Locks getMasterImpl( LifeSupport life )
     {
-        return life.add( locksFactory.newInstance() );
+        return life.add( maybeWrapWithDeferringLockManager( config, locksFactory.newInstance() ) );
     }
 
     @Override
     protected Locks getSlaveImpl( LifeSupport life )
     {
-        return life.add( new SlaveLockManager( locksFactory.newInstance(), requestContextFactory, master.cement(),
-                availabilityGuard, config ) );
+        SlaveLockManager lockManager =
+                new SlaveLockManager( locksFactory.newInstance(), requestContextFactory, master.cement(),
+                        availabilityGuard, config );
+        return life.add( maybeWrapWithDeferringLockManager( config, lockManager ) );
     }
 }
